@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calmora - AI Mental Health Companion</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #f5f7fa;
+      --text-color: #222;
+      --primary: #5068a9;
+      --light: #fff;
+    }
+    body.dark-mode {
+      --bg-color: #121212;
+      --text-color: #ddd;
+      --primary: #8aa0ff;
+      --light: #1f1f1f;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0; padding: 0;
+    }
+    header {
+      background-color: var(--primary);
+      color: white;
+      text-align: center;
+      padding: 1rem;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      padding: 1rem;
+    }
+    section {
+      background-color: var(--light);
+      border-radius: 10px;
+      padding: 1rem;
+    }
+    #chatbox {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      background-color: #eef3fb;
+    }
+    .message { margin: 0.5rem 0; }
+    .user { text-align: right; color: var(--primary); }
+    .bot { text-align: left; color: #444; }
+    .mood-form, .journal-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.5rem;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    textarea { resize: vertical; }
+    canvas { background: white; border-radius: 5px; }
+    .toggle-dark { margin: 1rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Calmora - Your AI Mental Health Companion</h1>
+  </header>
+  <div class="toggle-dark">
+    <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+  </div>
+  <div class="container">
+    <!-- Chatbot Section -->
+    <section>
+      <h2>Chat with Calmora</h2>
+      <div id="chatbox"></div>
+      <input id="userInput" placeholder="Type your message" />
+      <button onclick="sendMessage()">Send</button>
+    </section>
+
+    <!-- Mood Tracker Section -->
+    <section>
+      <h2>Mood Tracker</h2>
+      <canvas id="moodChart"></canvas>
+      <form class="mood-form" onsubmit="addMood(event)">
+        <input type="date" id="moodDate" required />
+        <select id="moodLevel" required>
+          <option value="">Select Mood</option>
+          <option value="1">1 - 😞</option>
+          <option value="2">2 - 😐</option>
+          <option value="3">3 - 🙂</option>
+          <option value="4">4 - 😊</option>
+          <option value="5">5 - 😄</option>
+        </select>
+        <button type="submit">Add Mood</button>
+        <button type="button" onclick="exportMoodData()">Export</button>
+        <input type="file" accept=".json" onchange="importMoodData(event)" />
+      </form>
+    </section>
+
+    <!-- Journal Section -->
+    <section>
+      <h2>Journal</h2>
+      <form class="journal-form" onsubmit="saveJournal(event)">
+        <textarea id="journalEntry" placeholder="Write here..." required></textarea>
+        <button type="submit">Save Entry</button>
+        <button type="button" onclick="exportJournal()">Export</button>
+        <input type="file" accept=".json" onchange="importJournal(event)" />
+      </form>
+      <div id="journalList"></div>
+    </section>
+  </div>
+
+  <script>
+    // Chatbot Logic
+    const chatbox = document.getElementById('chatbox');
+    const userInput = document.getElementById('userInput');
+    function sendMessage() {
+      const text = userInput.value.trim();
+      if (!text) return;
+      appendMessage(text, 'user');
+      const reply = generateReply(text);
+      setTimeout(() => appendMessage(reply, 'bot'), 600);
+      userInput.value = '';
+    }
+    function appendMessage(msg, sender) {
+      const div = document.createElement('div');
+      div.className = `message ${sender}`;
+      div.textContent = msg;
+      chatbox.appendChild(div);
+      chatbox.scrollTop = chatbox.scrollHeight;
+    }
+    function generateReply(input) {
+      input = input.toLowerCase();
+      if (input.includes("sad") || input.includes("bad")) return "I'm here for you. It’s okay to feel that way sometimes.";
+      if (input.includes("happy") || input.includes("good")) return "That’s lovely to hear! Keep enjoying those moments.";
+      if (input.includes("alone")) return "You are not alone. I’m right here with you.";
+      if (input.includes("help")) return "Of course. You can tell me anything.";
+      return "Thank you for sharing. Would you like to talk more about it?";
+    }
+
+    // Mood Tracker Logic
+    const moodChartCtx = document.getElementById('moodChart').getContext('2d');
+    let moodData = JSON.parse(localStorage.getItem('moodData') || '[]');
+    let chart;
+    function drawMoodChart() {
+      const labels = moodData.map(d => d.date);
+      const data = moodData.map(d => d.level);
+      if (chart) chart.destroy();
+      chart = new Chart(moodChartCtx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Mood Over Time',
+            data,
+            borderColor: '#5068a9',
+            fill: false
+          }]
+        }
+      });
+    }
+    function addMood(e) {
+      e.preventDefault();
+      const date = document.getElementById('moodDate').value;
+      const level = parseInt(document.getElementById('moodLevel').value);
+      const index = moodData.findIndex(m => m.date === date);
+      if (index >= 0) moodData[index].level = level;
+      else moodData.push({ date, level });
+      localStorage.setItem('moodData', JSON.stringify(moodData));
+      drawMoodChart();
+    }
+    function exportMoodData() {
+      const blob = new Blob([JSON.stringify(moodData)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'moodData.json';
+      a.click();
+    }
+    function importMoodData(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = () => {
+        moodData = JSON.parse(reader.result);
+        localStorage.setItem('moodData', JSON.stringify(moodData));
+        drawMoodChart();
+      };
+      reader.readAsText(file);
+    }
+    drawMoodChart();
+
+    // Journal Logic
+    let journal = JSON.parse(localStorage.getItem('journal') || '[]');
+    const journalList = document.getElementById('journalList');
+    function saveJournal(e) {
+      e.preventDefault();
+      const text = document.getElementById('journalEntry').value.trim();
+      const entry = { date: new Date().toLocaleString(), text };
+      journal.push(entry);
+      localStorage.setItem('journal', JSON.stringify(journal));
+      renderJournal();
+      document.getElementById('journalEntry').value = '';
+    }
+    function renderJournal() {
+      journalList.innerHTML = journal.map(e => `<p><strong>${e.date}</strong><br>${e.text}</p>`).join('');
+    }
+    function exportJournal() {
+      const blob = new Blob([JSON.stringify(journal)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'journal.json';
+      a.click();
+    }
+    function importJournal(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = () => {
+        journal = JSON.parse(reader.result);
+        localStorage.setItem('journal', JSON.stringify(journal));
+        renderJournal();
+      };
+      reader.readAsText(file);
+    }
+    renderJournal();
+
+    // Dark mode
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark-mode');
+    }
+  </script>
+</body>
+</html>
